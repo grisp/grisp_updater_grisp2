@@ -7,15 +7,18 @@
 %--- Includes ------------------------------------------------------------------
 
 -include_lib("kernel/include/logger.hrl").
+-include_lib("grisp_updater/include/grisp_updater.hrl").
 
 
 %--- Exports -------------------------------------------------------------------
 
 % Behaviour grisp_updater_source callbacks
 -export([system_init/1]).
--export([system_device/1]).
+-export([system_get_global_target/1]).
 -export([system_get_active/1]).
+% -export([system_get_updatable/1]).
 -export([system_prepare_update/2]).
+-export([system_prepare_target/4]).
 -export([system_set_updated/2]).
 -export([system_validate/1]).
 -export([system_terminate/2]).
@@ -43,7 +46,7 @@
 
 system_init(_Opts) ->
     ?LOG_INFO("Initializing GRiSP2 update system interface", []),
-    % TODO: Uses current working directory to fugre out the current
+    % TODO: Uses current working directory to figure out the current
     % booted system, should be changed to use the device tree.
     #{bootstate := #{active_system := Active, update_system := Update}} =
         grisp_barebox:get_all(),
@@ -54,11 +57,14 @@ system_init(_Opts) ->
     end,
     {ok, #sys_state{current = Current, active = Active, update = Update}}.
 
-system_device(_State) ->
-    <<"/dev/mmcsd-0">>.
+system_get_global_target(_State) ->
+    #target{device = <<"/dev/mmcsd-0">>, offset = 0, size = undefined}.
 
 system_get_active(#sys_state{current = Curr, active = Act}) ->
     {Curr, Curr =:= Act}.
+
+% system_get_updatable(#state{}) ->
+%     {error, not_updatable}.
 
 system_prepare_update(#sys_state{current = 0} = State, 1) ->
     grisp_rtems:unmount(<<"/media/mmcsd-0-1">>),
@@ -70,6 +76,15 @@ system_prepare_update(#sys_state{current = SysId}, SysId) ->
     {error, cannot_update_running_system};
 system_prepare_update(_State, SysId) ->
     {error, {invalid_update_system, SysId}}.
+
+system_prepare_target(_State, _SysId,
+                      #target{offset = SysOffset, size = SysSize} = SysTarget,
+                      #raw_target_spec{context = system, offset = ObjOffset})
+  when ObjOffset >= 0, ObjOffset < SysSize ->
+    {ok, SysTarget#target{
+        offset = SysOffset + ObjOffset,
+        size = SysSize - ObjOffset
+    }}.
 
 system_set_updated(#sys_state{current = 0} = State, 1) ->
     grisp_barebox:set([bootstate, update_system], 1),
