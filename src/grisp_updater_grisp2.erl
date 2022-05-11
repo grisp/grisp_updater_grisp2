@@ -38,7 +38,8 @@
 
 -record(http_state, {
     ltrim_regex :: re:mp(),
-    rtrim_regex :: re:mp()
+    rtrim_regex :: re:mp(),
+    tls_transport_opts = [] :: ssl:tls_client_option()
 }).
 
 
@@ -55,7 +56,11 @@ system_init(_Opts) ->
         {ok, "/media/mmcsd-0-1"} -> 1;
         {ok, "/media/mmcsd-1-" ++ _} -> removable
     end,
-    {ok, #sys_state{current = Current, active = Active, update = Update}}.
+    {ok, #sys_state{
+        current = Current,
+        active = Active,
+        update = Update
+    }}.
 
 system_get_global_target(_State) ->
     #target{device = <<"/dev/mmcsd-0">>, offset = 0, size = undefined}.
@@ -114,15 +119,17 @@ system_terminate(_State, _Reason) ->
 
 %--- Behaviour grisp_updater_http Callback -------------------------------------
 
-http_init(_Opts) ->
-    {ok, #http_state{}}.
+http_init(Opts) ->
+    {ok, #http_state{
+        tls_transport_opts = prepare_tls_options(Opts)
+    }}.
 
 http_connection_options(State, Url) ->
     case uri_string:parse(Url) of
         #{scheme := <<"https">>, host := Host} = Parts ->
             Hostname = unicode:characters_to_list(Host),
             Port = maps:get(port, Parts, 443),
-            Opts = tls_options(Host),
+            Opts = tls_options(State, Host),
             {ok, Hostname, Port, Opts, State};
         #{scheme := <<"http">>, host := Host} = Parts ->
             Hostname = unicode:characters_to_list(Host),
@@ -135,16 +142,66 @@ http_connection_options(State, Url) ->
 
 %--- Internal Functions --------------------------------------------------------
 
-tls_options(Host) ->
-    Priv = code:priv_dir(grisp_cryptoauth),
-    {ok, CLICAPEM1} = file:read_file(filename:join([Priv, "grisp2_ca.pem"])),
-    {ok, CLICAPEM2} = file:read_file(filename:join([Priv, "stritzinger_root.pem"])),
-    [{'Certificate', CLICADER1, not_encrypted}] = public_key:pem_decode(CLICAPEM1),
-    [{'Certificate', CLICADER2, not_encrypted}] = public_key:pem_decode(CLICAPEM2),
-    TransportOpts = [
-        {server_name_indication, unicode:characters_to_list(Host)},
-        {cacerts, [CLICADER2]},
-        {cert, [grisp_cryptoauth:read_cert(primary, der), CLICADER1]},
-        {key, #{algorithm => ecdsa, sign_fun => {grisp_cryptoauth, sign_fun}}}
-    ],
-    #{transport => tls, transport_opts => TransportOpts}.
+config_bool(Key, Default) ->
+    case application:get_env(grisp_updater_grisp2, Key) of
+        undefined -> Default;
+        {ok, Value} when is_boolean(Value) -> Value
+    end.
+
+config_directory(Key) ->
+    Dir  = case application:get_env(grisp_updater_grisp2, Key) of
+        undefined -> error;
+        {ok, Path} when is_binary(Path) -> binary_to_list(Path);
+        {ok, Path} when is_list(Path) -> Path;
+        {ok, {priv, AppName, SubPath}} when is_binary(SubPath) ->
+            case code:priv_dir(AppName) of
+                {error, bad_name} -> error({bad_config, Key});
+                 Base -> filename:join(Base, binary_to_list(SubPath))
+            end;
+        {ok, {priv, AppName, SubPath}} when is_list(SubPath) ->
+            case code:priv_dir(AppName) of
+                {error, bad_name} -> error({bad_config, Key});
+                 Base -> filename:join(Base, SubPath)
+            end
+    end,
+    case filelib:is_dir(Dir) of
+        true -> Dir;
+        false -> error({directory_not_found, Dir})
+    end.
+
+load_cert(Path) ->
+    {ok, PEM} = file:read_file(Path),
+    [{'Certificate', DER, not_encrypted}] = public_key:pem_decode(PEM),
+    DER.
+
+prepare_tls_options(_Opts) ->
+    {CACerts, VerifyMode} = case config_directory(server_certificates) of
+        error -> {[], verify_none};
+        CertDir ->
+            {[load_cert(filename:join(CertDir, F))
+              || F <- filelib:wildcard("*.crt", CertDir)], verify_peer}
+    end,
+    case config_bool(use_client_certificate, false) of
+        false ->
+            [{verify, VerifyMode}, {cacerts, CACerts}];
+        true ->
+            %TODO: Should figure out the client CA certitifcate of ask grisp_cryptoauth
+            CryptoAuthPriv = code:priv_dir(grisp_cryptoauth),
+            IntermediaryCA = load_cert(filename:join(CryptoAuthPriv, "grisp2_ca.pem")),
+            RootCA = load_cert(filename:join(CryptoAuthPriv, "stritzinger_root.pem")),
+            [
+                {verify, VerifyMode},
+                {cacerts, [RootCA | CACerts]},
+                {cert, [grisp_cryptoauth:read_cert(primary, der), IntermediaryCA]},
+                {key, #{algorithm => ecdsa, sign_fun => {grisp_cryptoauth, sign_fun}}}
+            ]
+    end.
+
+tls_options(#http_state{tls_transport_opts = TransOpts}, Host) ->
+    #{
+        transport => tls,
+        transport_opts => [
+            {server_name_indication, unicode:characters_to_list(Host)}
+            | TransOpts
+        ]
+    }.

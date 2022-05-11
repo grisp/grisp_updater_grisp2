@@ -1,4 +1,9 @@
 [
+    {grisp_updater_grisp2, [
+        {use_client_certificate, false},
+        {server_certificates, {priv, grisp_updater_grisp2, "certificates"}}
+    ]}
+
     {grisp_updater, [
         {system, {grisp_updater_grisp2, #{}}},
         {sources, [
