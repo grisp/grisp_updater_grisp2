@@ -21,4 +21,5 @@ rebar3.crashdump
 *.tar
 config/dev.config
 dummy.img
+eeprom_*.dat
 .tool-versions

@@ -7,6 +7,7 @@
 %--- Includes ------------------------------------------------------------------
 
 -include_lib("kernel/include/logger.hrl").
+-include_lib("grisp/include/grisp.hrl").
 -include_lib("grisp_updater/include/grisp_updater.hrl").
 
 
@@ -38,8 +39,7 @@
 
 -record(http_state, {
     ltrim_regex :: re:mp(),
-    rtrim_regex :: re:mp(),
-    tls_transport_opts = [] :: ssl:tls_client_option()
+    rtrim_regex :: re:mp()
 }).
 
 
@@ -47,15 +47,9 @@
 
 system_init(_Opts) ->
     ?LOG_INFO("Initializing GRiSP2 update system interface", []),
-    % TODO: Uses current working directory to figure out the current
-    % booted system, should be changed to use the device tree.
     #{bootstate := #{active_system := Active, update_system := Update}} =
         grisp_barebox:get_all(),
-    Current = case file:get_cwd() of
-        {ok, "/media/mmcsd-0-0"} -> 0;
-        {ok, "/media/mmcsd-0-1"} -> 1;
-        {ok, "/media/mmcsd-1-" ++ _} -> removable
-    end,
+    Current = current_system(),
     {ok, #sys_state{
         current = Current,
         active = Active,
@@ -119,18 +113,19 @@ system_terminate(_State, _Reason) ->
 
 %--- Behaviour grisp_updater_http Callback -------------------------------------
 
-http_init(Opts) ->
-    {ok, #http_state{
-        tls_transport_opts = prepare_tls_options(Opts)
-    }}.
+http_init(_Opts) ->
+    {ok, #http_state{}}.
 
 http_connection_options(State, Url) ->
     case uri_string:parse(Url) of
         #{scheme := <<"https">>, host := Host} = Parts ->
             Hostname = unicode:characters_to_list(Host),
             Port = maps:get(port, Parts, 443),
-            Opts = tls_options(State, Host),
-            {ok, Hostname, Port, Opts, State};
+            GunOpts = #{
+                transport => tls,
+                transport_opts => grisp_cryptoauth_tls:options(Hostname)
+            },
+            {ok, Hostname, Port, GunOpts, State};
         #{scheme := <<"http">>, host := Host} = Parts ->
             Hostname = unicode:characters_to_list(Host),
             Port = maps:get(port, Parts, 80),
@@ -142,66 +137,12 @@ http_connection_options(State, Url) ->
 
 %--- Internal Functions --------------------------------------------------------
 
-config_bool(Key, Default) ->
-    case application:get_env(grisp_updater_grisp2, Key) of
-        undefined -> Default;
-        {ok, Value} when is_boolean(Value) -> Value
+current_system() ->
+    % TODO: Uses current working directory to figure out the current
+    % booted system, should be changed to use the device tree.
+    case {?IS_EMULATED, file:get_cwd()} of
+        {true, _} -> 0;
+        {false, {ok, "/media/mmcsd-0-0"}} -> 0;
+        {false, {ok, "/media/mmcsd-0-1"}} -> 1;
+        {false, {ok, "/media/mmcsd-1-" ++ _}} -> removable
     end.
-
-config_directory(Key) ->
-    Dir  = case application:get_env(grisp_updater_grisp2, Key) of
-        undefined -> error;
-        {ok, Path} when is_binary(Path) -> binary_to_list(Path);
-        {ok, Path} when is_list(Path) -> Path;
-        {ok, {priv, AppName, SubPath}} when is_binary(SubPath) ->
-            case code:priv_dir(AppName) of
-                {error, bad_name} -> error({bad_config, Key});
-                 Base -> filename:join(Base, binary_to_list(SubPath))
-            end;
-        {ok, {priv, AppName, SubPath}} when is_list(SubPath) ->
-            case code:priv_dir(AppName) of
-                {error, bad_name} -> error({bad_config, Key});
-                 Base -> filename:join(Base, SubPath)
-            end
-    end,
-    case filelib:is_dir(Dir) of
-        true -> Dir;
-        false -> error({directory_not_found, Dir})
-    end.
-
-load_cert(Path) ->
-    {ok, PEM} = file:read_file(Path),
-    [{'Certificate', DER, not_encrypted}] = public_key:pem_decode(PEM),
-    DER.
-
-prepare_tls_options(_Opts) ->
-    {CACerts, VerifyMode} = case config_directory(server_certificates) of
-        error -> {[], verify_none};
-        CertDir ->
-            {[load_cert(filename:join(CertDir, F))
-              || F <- filelib:wildcard("*.crt", CertDir)], verify_peer}
-    end,
-    case config_bool(use_client_certificate, false) of
-        false ->
-            [{verify, VerifyMode}, {cacerts, CACerts}];
-        true ->
-            %TODO: Should figure out the client CA certitifcate of ask grisp_cryptoauth
-            CryptoAuthPriv = code:priv_dir(grisp_cryptoauth),
-            IntermediaryCA = load_cert(filename:join(CryptoAuthPriv, "grisp2_ca.pem")),
-            RootCA = load_cert(filename:join(CryptoAuthPriv, "stritzinger_root.pem")),
-            [
-                {verify, VerifyMode},
-                {cacerts, [RootCA | CACerts]},
-                {cert, [grisp_cryptoauth:read_cert(primary, der), IntermediaryCA]},
-                {key, #{algorithm => ecdsa, sign_fun => {grisp_cryptoauth, sign_fun}}}
-            ]
-    end.
-
-tls_options(#http_state{tls_transport_opts = TransOpts}, Host) ->
-    #{
-        transport => tls,
-        transport_opts => [
-            {server_name_indication, unicode:characters_to_list(Host)}
-            | TransOpts
-        ]
-    }.

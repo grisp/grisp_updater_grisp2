@@ -1,0 +1,39 @@
+[
+    {grisp_cryptoauth, [
+        {tls_use_client_certificate, false},
+        {tls_verify, verify_none}
+    ]},
+
+    {grisp_updater, [
+        %{signature_check, true},
+        %{signature_certificates, {priv, grisp_updater, "certificates"}},
+        %{storage, {grisp_updater_filesystem, #{}}},
+        {system, {grisp_updater_dummy, #{device_size => 1140850688}}},
+        %{sources, [{grisp_updater_tarball, #{}}]}
+    ]},
+
+    {grisp_updater, [
+        {system, {grisp_updater_grisp2, #{}}},
+        {sources, [
+            {grisp_updater_tarball, #{}},
+            {grisp_updater_http, #{
+                backend => {grisp_updater_grisp2, #{}}
+            }}
+        ]}
+    ]},
+
+    {kernel, [
+        {logger_level, debug},
+        {logger, [
+            {handler, default, logger_std_h, #{
+                level => info,
+                filter_default => log,
+                config => #{type => standard_io},
+                formatter => {logger_formatter, #{
+                    legacy_header => false,
+                    single_line => true
+                }}
+            }}
+        ]}
+    ]}
+].

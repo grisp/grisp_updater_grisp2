@@ -1,17 +1,17 @@
-{application, grisp_updater_grisp2,
- [{description, "GRiSP Software Update for GRiSP2 boards"},
-  {vsn, "0.1.0"},
-  {registered, []},
-  {applications,
-   [kernel,
-    stdlib,
-    grisp,
-    grisp_cryptoauth,
-    grisp_updater
-   ]},
-  {env,[]},
-  {modules, []},
+{application, grisp_updater_grisp2, [
+    {description, "GRiSP Software Update for GRiSP2 boards"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {applications, [
+        kernel,
+        stdlib,
+        grisp,
+        grisp_cryptoauth,
+        grisp_updater
+    ]},
+    {env,[]},
+    {modules, []},
 
-  {licenses, ["Apache 2.0"]},
-  {links, []}
+    {licenses, ["Apache 2.0"]},
+    {links, []}
  ]}.
