@@ -20,6 +20,7 @@
 -export([system_prepare_update/2]).
 -export([system_prepare_target/4]).
 -export([system_set_updated/2]).
+-export([system_cancel_update/1]).
 -export([system_validate/1]).
 -export([system_terminate/2]).
 
@@ -91,6 +92,9 @@ system_set_updated(#sys_state{boot = Boot, valid = 1} = State, 0)
     {ok, mark_updated(State, 0)};
 system_set_updated(#sys_state{boot = Boot, valid = Valid}, SysId) ->
     {error, {unexpected_update_state, {Boot, Valid, SysId}}}.
+
+system_cancel_update(#sys_state{valid = Valid} = State) ->
+    {ok, validate_update(State, Valid)}.
 
 system_validate(#sys_state{boot = SysId, update = SysId} = State) ->
     {ok, validate_update(State, SysId)};
