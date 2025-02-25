@@ -1,6 +1,6 @@
 {application, grisp_updater_grisp2, [
     {description, "GRiSP Software Update for GRiSP2 boards"},
-    {vsn, "0.2.0"},
+    {vsn, "0.2.1"},
     {registered, []},
     {applications, [
         kernel,
