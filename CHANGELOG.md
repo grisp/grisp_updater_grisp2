@@ -11,6 +11,7 @@ and this project adheres to
 - Upgraded gun to version "2.1.0"
 - Upgraded grisp to version "2.8.0"
 - Upgraded grisp_updater to version "2.1.1"
+- Upgraded grisp_cryptoauth to version "2.4.1"
 
 ## [0.2.0] - 2024-10-12
 
