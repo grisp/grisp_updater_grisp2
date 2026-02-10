@@ -8,6 +8,12 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-02-10
+
+### Added
+
+- Support for OTP 28
+
 ## [0.2.1] - 2025-02-25
 
 ### Changed
@@ -27,7 +33,8 @@ and this project adheres to
 
 First release.
 
-[Unreleased]: https://github.com/grisp/grisp_updater_grisp2/compare/0.2.1...HEAD
+[Unreleased]: https://github.com/grisp/grisp_updater_grisp2/compare/1.0.0...HEAD
+[1.0.0]: https://github.com/grisp/grisp_updater_grisp2/compare/0.2.1...1.0.0
 [0.2.1]: https://github.com/grisp/grisp_updater_grisp2/compare/0.2.0...0.2.1
 [0.2.0]: https://github.com/grisp/grisp_updater_grisp2/compare/0.1.0...0.2.0
 [0.1.0]: https://github.com/grisp/grisp_updater_grisp2/compare/92611abdbcd109e13a75cab4421469ff2f93d841...0.1.0
