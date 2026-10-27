@@ -8,6 +8,16 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-10-27
+
+### Changed
+
+- Updated `grisp_updater` to 2.3.1 and resolved Gun 2.7.0 with Cowlib 2.21.0.
+
+### Security
+
+- Added GitHub Actions security analysis with zizmor.
+
 ## [1.0.0] - 2026-02-10
 
 ### Added
@@ -33,7 +43,8 @@ and this project adheres to
 
 First release.
 
-[Unreleased]: https://github.com/grisp/grisp_updater_grisp2/compare/1.0.0...HEAD
+[Unreleased]: https://github.com/grisp/grisp_updater_grisp2/compare/1.0.1...HEAD
+[1.0.1]: https://github.com/grisp/grisp_updater_grisp2/compare/1.0.0...1.0.1
 [1.0.0]: https://github.com/grisp/grisp_updater_grisp2/compare/0.2.1...1.0.0
 [0.2.1]: https://github.com/grisp/grisp_updater_grisp2/compare/0.2.0...0.2.1
 [0.2.0]: https://github.com/grisp/grisp_updater_grisp2/compare/0.1.0...0.2.0
